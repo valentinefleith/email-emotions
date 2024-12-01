@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Oct 21 13:41:54 2024
+Created on Thu Nov 21 17:32:35 2024
 
 @author: pauline
 """
+
 import stanza
 import csv
 
 
-path = "../collected_emails.csv"
+path = "../generated_emails.csv"
 
 
 def load_stopwords(path: str) -> list:
@@ -33,27 +34,17 @@ def load_stopwords(path: str) -> list:
 def read_vader(vader_path: str) -> dict[str, float]:
 
     vader = {}
-
+    
     with open(vader_path, "r", encoding="utf8") as file:
-
+        
         token_ligne = file.readlines()
-
-        for ligne in token_ligne:
+        
+        for ligne in token_ligne :
             info_token = ligne.split("->")
             vader[str(info_token[0])] = float(info_token[1])
 
     return vader
 
-
-def anonymisation(mail_annote)->str:
-    mail_anon = ""
-    for word in mail_annote :
-        if word.upos == "PROPN":
-            mail_anon = mail_anon + " Polopopo"
-        else:
-            mail_anon = mail_anon + " " + word.text
-            
-    return mail_anon
 
 
 def get_features(list_token_annote, vader)->dict:
@@ -89,78 +80,74 @@ def get_features(list_token_annote, vader)->dict:
     for pos in ["NOUN", "VERB", "ADV", "ADJ", "CCONJ"]:
         if features[pos] == 0:
             features[f"BOOL_{pos}"] = 0
-        else:
+        else :
             features[f"BOOL_{pos}"] = 1
-
     return features
-
-            
+                
+                
 
 def get_data(path:str, nlp, stop_words)->list[list]:
     
-
     dic = {
-        "neutre": 1,
-        "joie": 2,
-        "tristesse": 3,
-        "colère": 4,
-        "surprise_pos": 5,
-        "surprise_neg": 6,
+    "neutre" : 0,
+    "joie" : 1,
+    "tristesse" : 2,
+    "colère" : 3,
+    "surprise_pos" : 4,
+    "surprise_neg" : 5
     }
-
+    
     data = []
+    
+    with open(path, newline='') as csvfile:
 
-    with open(path, newline="") as csvfile:
-
-        vader = read_vader("../resources/vader_lexicon.txt")
-        reader = csv.reader(csvfile, delimiter="|")
+        vader = read_vader("../ressources/vader_lexicon.txt")
+        reader = csv.reader(csvfile, delimiter='|')
         next(reader)
 
         for row in reader:
             for k, item in dic.items():
-                mail_raw = [x.strip() for x in row[dic[k]].split("***") if x != ""]
-                mails_annotes = [nlp(x) for x in mail_raw]
-                for mail_annote in mails_annotes:
-                    mail_raw = [ x.strip() for x in row[dic[k]].split("***") if x != "" ]
-                    mails_annotes = [ nlp(x) for x in mail_raw]
-                    mails_annote_sw = [
-                    [
-                        token
-                        for sentence in mail_annote.sentences
-                        for token in sentence.words
-                        if token.text.lower() not in stop_words
-                        ]
-                    for mail_annote in mails_annotes
-                    ]
-                for mail_annote in mails_annote_sw :
-                    txt_anon = anonymisation(mail_annote)
-                    txt_features = get_features(mail_annote, vader)
-                    txt_features["LABEL"] = k
-                    txt_features["TEXT"] = txt_anon
+                 mail_raw = [ x.strip() for x in row[dic[k]].split("***") if x != "" ]
+                 mails_annotes = [ nlp(x) for x in mail_raw]
+                 mails_annote_sw = [
+                     [
+                         token
+                         for sentence in mail_annote.sentences
+                         for token in sentence.words
+                         if token.text.lower() not in stop_words
+                         ]
+                     for mail_annote in mails_annotes
+                     ]
+                 for mail_annote in mails_annote_sw :
+                     txt_features = get_features(mail_annote, vader)
+                     txt_features["LABEL"] = k
+                     txt_features["TEXT"] = " ".join([x.text for x in mail_annote])
+                     
+                     data.append(txt_features)
 
-                    data.append(txt_features)
 
+            
     return data
 
 
-def write_csv(data: list):
+def write_csv(data:list):
 
-    file = "../data_featurized.csv"
-    with open(file, mode="w", newline="", encoding="utf-8") as fichier_csv:
+    file = "../dataIA_featurized.csv"
+    with open(file, mode='w', newline='', encoding='utf-8') as fichier_csv:
         writer = csv.DictWriter(fichier_csv, fieldnames=data[0].keys())
         writer.writeheader()
         writer.writerows(data)
-
-    return print("le csv a été créé au chemin ../data_featurized.csv")
+    
+    return print("le csv a été créé au chemin ../dataIA_featurized.csv")
 
 
 def main(path):
     nlp = stanza.Pipeline(lang='fr', processors='tokenize, mwt, pos,lemma')
-    stop_words = load_stopwords("../resources/fr-stopwords.txt")
+    stop_words = load_stopwords("../ressources/fr-stopwords.txt")
     data = get_data(path, nlp, stop_words)
     write_csv(data)
-
+    
     return print("done")
-
-
+    
+    
 main(path)
